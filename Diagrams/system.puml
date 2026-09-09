@@ -1,0 +1,96 @@
+@startuml
+!define RECTANGLE class
+
+skinparam rectangle {
+    BackgroundColor<<current>> LightYellow
+    BackgroundColor<<proposed>> LightGreen
+    BackgroundColor<<human>> LightBlue
+    BackgroundColor<<external>> LightGray
+    BorderColor Black
+    FontSize 11
+}
+
+skinparam note {
+    BackgroundColor Wheat
+    BorderColor Black
+}
+
+title System Context: Current vs Proposed FairN² System
+
+package "Current System (Microsoft Forms)" <<current>> {
+    rectangle "Microsoft Forms\n(Per Category)" as Forms <<current>>
+    rectangle "Manual Spreadsheet\nAggregation" as Spreadsheet <<current>>
+    rectangle "Manual Form\nCreation Process" as FormCreation <<current>>
+}
+
+package "Proposed FairN² System" <<proposed>> {
+    rectangle "FairN² Mobile App\n(Judge Interface)" as MobileApp <<proposed>>
+    rectangle "FairN² Admin Web\n(Configuration & Monitoring)" as AdminWeb <<proposed>>
+    rectangle "Backend Server\n(API, Business Logic)" as Backend <<proposed>>
+    rectangle "Database\n(PostgreSQL)" as Database <<proposed>>
+}
+
+actor "Judge" as Judge <<human>>
+actor "Administrator\n(Awards Staff)" as Admin <<human>>
+actor "HunterWiSE\nAwards Coordinator" as Coordinator <<human>>
+
+rectangle "Physical Event\nVenue" as Venue <<external>>
+rectangle "Project Posters\n& Displays" as Posters <<external>>
+
+' Current System Relationships
+Judge -down-> Forms : "Manually navigate to\ncorrect form URL"
+Forms -down-> Spreadsheet : "Export responses"
+Admin -down-> FormCreation : "Create forms for\neach category"
+FormCreation -down-> Forms : "Deploy forms"
+Admin -down-> Spreadsheet : "Manual tallying\nand calculation"
+Spreadsheet -down-> Coordinator : "Provide winner list\n(45-60 min delay)"
+
+' Proposed System Relationships
+Judge -down-> MobileApp : "Authenticate & score\nassigned projects"
+Admin -down-> AdminWeb : "Configure event,\nmanage judges/projects"
+Coordinator -down-> AdminWeb : "Monitor progress,\nview results"
+
+MobileApp -down-> Backend : "HTTPS REST API\n(scores, authentication)"
+AdminWeb -down-> Backend : "HTTPS REST API\n(configuration, results)"
+Backend -down-> Database : "Store scores, judges,\nprojects, constraints"
+
+Judge -right-> Posters : "View and assess\nproject displays"
+Posters -up-> Venue : "Located in"
+
+' Data flow annotations
+note right of Forms
+    **Current Issues:**
+    • Separate form per category
+    • No judge assignment enforcement
+    • Manual URL distribution
+    • No real-time monitoring
+end note
+
+note right of Spreadsheet
+    **Manual Process:**
+    • Export all form responses
+    • Aggregate scores manually
+    • Apply fairness constraints manually
+    • Time-consuming and error-prone
+    • 45-60 minutes processing time
+end note
+
+note right of Backend
+    **Automated Processing:**
+    • Real-time score aggregation
+    • Automatic constraint enforcement
+    • Judge-category restrictions
+    • <5 minute winner calculation
+    • Reduces admin workload by 80%
+end note
+
+note left of MobileApp
+    **Key Improvements:**
+    • Single app, all categories
+    • Only shows assigned categories
+    • Real-time submission feedback
+    • Offline capability
+    • <3 min scoring per project
+end note
+
+@enduml

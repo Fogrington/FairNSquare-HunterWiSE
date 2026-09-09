@@ -1,0 +1,100 @@
+ALGORITHM: FairN2 Scoring & Fairness Engine
+INPUT:  event_id
+OUTPUT: ranked_results per category, with winners assigned
+
+=======================================================
+FUNCTION calculateWeightedScores(category_id)
+=======================================================
+  projects ← getProjectsByCategory(category_id)
+  criteria ← getCriteriaByCategory(category_id)   // each criterion has a weight
+
+  FOR EACH project IN projects DO
+    total ← 0
+    judgeCount ← 0
+
+    FOR EACH criterion IN criteria DO
+      scores ← getScores(project.id, criterion.id)
+
+      IF scores is empty THEN
+        CONTINUE
+
+      criterionAvg ← sum(scores) / count(scores)
+      total ← total + (criterionAvg × criterion.weight)
+      judgeCount ← judgeCount + count(scores)
+    END FOR
+
+    project.rawScore ← total
+    project.judgeCount ← judgeCount
+  END FOR
+
+  RETURN projects sorted by rawScore DESCENDING
+
+
+=======================================================
+FUNCTION applyEquityRefactoring(projects)
+=======================================================
+  // Adjust raw scores to account for team size and
+  // institutional representation imbalances
+
+  FOR EACH project IN projects DO
+
+    // Team size adjustment: solo projects scored slightly
+    // higher to offset resource disadvantage
+    IF project.teamSize == 1 THEN
+      project.adjustedScore ← project.rawScore × SOLO_MULTIPLIER
+    ELSE
+      project.adjustedScore ← project.rawScore
+
+    // Institutional adjustment: flag if institution is
+    // underrepresented in the event cohort
+    institutionCount ← countProjectsByInstitution(project.institution)
+    totalProjects    ← count(projects)
+    representation  ← institutionCount / totalProjects
+
+    IF representation < REPRESENTATION_THRESHOLD THEN
+      project.adjustedScore ← project.adjustedScore × EQUITY_MULTIPLIER
+    END IF
+
+  END FOR
+
+  RETURN projects sorted by adjustedScore DESCENDING
+
+
+=======================================================
+FUNCTION applyWinDeduplication(allCategories)
+=======================================================
+  // Ensure no project wins more than one category award
+  assignedWinners ← empty set
+
+  FOR EACH category IN allCategories DO
+    rankedProjects ← calculateWeightedScores(category.id)
+    rankedProjects ← applyEquityRefactoring(rankedProjects)
+
+    rank ← 1
+    FOR EACH project IN rankedProjects DO
+
+      IF project.id NOT IN assignedWinners THEN
+        category.winner ← project
+        assignedWinners.add(project.id)
+        BREAK   // first eligible project wins this category
+      END IF
+
+      // project already won another category — skip and
+      // continue to next highest scoring eligible project
+      rank ← rank + 1
+    END FOR
+
+    // store full ranked list for results display
+    category.rankedList ← rankedProjects
+  END FOR
+
+  RETURN allCategories
+
+
+=======================================================
+FUNCTION generateResults(event_id)
+=======================================================
+  categories ← getCategoriesByEvent(event_id)
+  results    ← applyWinDeduplication(categories)
+  persistResults(results)
+  RETURN results

@@ -1,0 +1,76 @@
+.page { display: flex; flex-direction: column; gap: 24px; }
+
+.headerCard {
+  background: var(--blue);
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border: 1.5px solid var(--black);
+}
+
+.welcome { font-size: 32px; font-weight: 800; color: var(--black); line-height: 1; }
+.adminName { font-size: 20px; font-weight: 600; color: var(--black); margin-top: 4px; }
+.headerRight { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.time { font-size: 16px; font-weight: 600; color: var(--black); }
+.date { font-size: 14px; color: var(--black); opacity: 0.75; }
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.statCard {
+  background: var(--surface);
+  border-radius: 14px;
+  border: 1.5px solid var(--black);
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.statValue { font-size: 36px; font-weight: 800; color: var(--black); line-height: 1; }
+.statLabel { font-size: 14px; font-weight: 700; color: var(--text); }
+.statSub { font-size: 12px; color: var(--text-muted); }
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.table {
+  background: var(--surface);
+  border-radius: 14px;
+  border: 1.5px solid var(--border);
+  overflow: hidden;
+}
+
+.tableHeader {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  padding: 12px 20px;
+  background: var(--bg);
+  border-bottom: 1.5px solid var(--border);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tableRow {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--bg);
+  font-size: 14px;
+  align-items: center;
+}
+
+.tableRow:last-child { border-bottom: none; }
+
+.catName { font-weight: 600; color: var(--text); }

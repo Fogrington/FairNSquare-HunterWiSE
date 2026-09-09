@@ -1,0 +1,83 @@
+@startuml
+skinparam componentStyle rectangle
+skinparam defaultTextAlignment center
+skinparam component {
+    BackgroundColor<<mobile>> LightSkyBlue
+    BackgroundColor<<web>> LightGreen
+    BackgroundColor<<backend>> Wheat
+    BackgroundColor<<database>> LightYellow
+    BorderColor Black
+    FontSize 13
+    ArrowThickness 2
+}
+
+skinparam note {
+    BackgroundColor WhiteSmoke
+    BorderColor Black
+    FontSize 12
+}
+
+title FairN² System Architecture
+
+package "Client Layer" {
+    component [FairN² Mobile App\n(React Native)\n\nJudge Interface] as Mobile <<mobile>>
+    component [FairN² Admin Web\n(React)\n\nConfiguration & Monitoring] as Web <<web>>
+}
+
+package "Application Layer" {
+    component [Backend API Server\n(Node.js + Express)\n\nBusiness Logic & Services] as Backend <<backend>>
+}
+
+package "Data Layer" {
+    database [PostgreSQL Database\n\nJudges | Categories\nProjects | Scores | Results] as DB <<database>>
+}
+
+' Main connections
+Mobile -down-> Backend : "HTTPS REST API\n(Authentication, Scores)"
+Web -down-> Backend : "HTTPS REST API\n(Configuration, Results)"
+Backend -down-> DB : "SQL Queries\n(Read/Write)"
+
+' Bidirectional real-time
+Backend -up-> Web : "Real-time Updates\n(Socket.io)"
+
+note right of Mobile
+  **Judge Functions:**
+  • Login with credentials
+  • View assigned categories
+  • Score projects (weighted criteria)
+  • Offline queueing
+  • Submit scores
+end note
+
+note right of Web
+  **Admin Functions:**
+  • Configure event setup
+  • Manage judges & projects
+  • Monitor live progress
+  • View results & export
+end note
+
+note left of Backend
+  **Core Services:**
+  • JWT Authentication
+  • Category Management
+  • Score Aggregation
+  • Constraint Enforcement
+  • Real-time Sync
+  
+  **Fairness Rules:**
+  • Single-category wins
+  • Judge restrictions
+  • Cascading allocation
+end note
+
+note left of DB
+  **Data Storage:**
+  • Judge accounts & assignments
+  • Event categories & criteria
+  • Project information
+  • Submitted scores
+  • Calculated results
+end note
+
+@enduml

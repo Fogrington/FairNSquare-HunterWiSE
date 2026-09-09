@@ -1,0 +1,146 @@
+@startgantt
+title FairScore Project Timeline
+projectscale weekly
+printscale weekly
+scale 2.0
+saturday are closed
+sunday are closed
+
+Project starts 2026-02-12
+
+-- Semester 1: Requirements & Design --
+[Project Initiation] as [INIT] lasts 14 days
+note bottom
+  Project proposal development
+  Initial HunterWiSE meeting (12/02)
+  Stakeholder consultation
+end note
+
+[Requirements Elicitation] as [REQ] lasts 14 days
+[REQ] starts at [INIT]'s end
+note bottom
+  Document current process
+  Define fairness constraints
+  Establish success criteria
+end note
+
+[Prototype 1: Mockups] as [P1] lasts 21 days
+[P1] starts at [REQ]'s end
+note bottom
+  UI/UX wireframes
+  System architecture
+  Database schema
+  Algorithm pseudocode
+end note
+
+[P1 Testing] as [P1T] lasts 7 days
+[P1T] starts at [P1]'s end
+
+[P1 Client Review] as [P1M] happens at [P1T]'s end
+
+[Sem 1 Ends] as [SEM1END] happens 2026-04-24
+
+-- Mid-Year Break: Core Development --
+
+[P2a: Foundation] as [P2A] lasts 21 days
+[P2A] starts 2026-04-25
+note bottom
+  React Native setup
+  Backend API foundation
+  Database implementation
+  Testing framework
+end note
+
+[P2b: Core Features] as [P2B] lasts 28 days
+[P2B] starts at [P2A]'s end
+note bottom
+  Scoring workflow
+  Aggregation algorithms
+  Constraint enforcement
+  Admin dashboard basics
+end note
+
+[P2c: Integration] as [P2C] lasts 21 days
+[P2C] starts at [P2B]'s end
+note bottom
+  Frontend-backend integration
+  Real-time sync
+  Error handling
+  Expand tests
+end note
+
+[P2 Testing] as [P2T] lasts 7 days
+[P2T] starts at [P2C]'s end
+
+[P2 Client Demo] as [P2M] happens at [P2T]'s end
+
+-- Semester 2: Production & Testing --
+
+[Sem 2 Starts] as [SEM2START] happens 2026-08-17
+
+[P3a: Features] as [P3A] lasts 14 days
+[P3A] starts 2026-08-17
+note bottom
+  Complete MVP features
+  Admin dashboard
+  Offline mode
+  UI/UX polish
+end note
+
+[P3b: Documentation] as [P3B] lasts 10 days
+[P3B] starts at [P3A]'s end
+note bottom
+  Expand test suite
+  User documentation
+  Production deployment
+  App store materials
+end note
+
+[User Acceptance Test] as [UAT] lasts 7 days
+[UAT] starts at [P3B]'s end
+
+[Load Testing] as [LOAD] lasts 5 days
+[LOAD] starts at [UAT]'s end
+
+[Bug Fixes] as [BUGFIX] lasts 10 days
+[BUGFIX] starts at [LOAD]'s end
+
+[P3 Client Review] as [P3M] happens at [BUGFIX]'s end
+
+-- Deployment & Launch --
+
+[App Store Submission] as [APPSTORE] lasts 28 days
+[APPSTORE] starts at [LOAD]'s end
+note bottom
+  Submit to Apple & Google
+  Address review feedback
+  Production deployment
+  Load production data
+end note
+
+[Pre-Event Prep] as [PREP] lasts 14 days
+[PREP] starts at [APPSTORE]'s end
+note bottom
+  Venue testing
+  Judge training
+  Admin walkthrough
+  Final verification
+end note
+
+[System Ready] as [READY] happens at [PREP]'s end
+
+[Buffer Period] as [BUFFER] lasts 7 days
+[BUFFER] starts at [READY]'s end
+
+
+-- Milestones --
+[INIT] is colored in LightBlue
+[P1M] is colored in LightGreen
+[SEM1END] is colored in Gold
+[P2M] is colored in LightGreen
+[SEM2START] is colored in Gold
+[P3M] is colored in LightGreen
+[READY] is colored in LightGreen
+[EVENT] is colored in Crimson
+
+@endgantt
