@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useAdmin } from '../context/AdminContext'
+import CsvImportPanel, { ParsedCsvRow } from '../components/CsvImportPanel'
+import { CSVRecord } from '../utils/csv'
 import styles from './Categories.module.css'
 
 export default function Categories() {
@@ -11,6 +13,30 @@ export default function Categories() {
   const [showProjectForm, setShowProjectForm] = useState<number | null>(null)
   const [projectForm, setProjectForm] = useState({ title: '', presenter: '', institution: '' })
   const [projectError, setProjectError] = useState('')
+  const [showImport, setShowImport] = useState(false)
+
+  type ProjectImportPayload = { categoryId: number; title: string; presenter: string; institution: string }
+
+  const parseProjectRow = (record: CSVRecord, index: number): ParsedCsvRow<ProjectImportPayload> => {
+    const categoryName = record.get('Category', 'Category Name')
+    const title = record.get('Title', 'Project Title')
+    const presenter = record.get('Presenter', 'Presenter Name', 'Team')
+    const institution = record.get('Institution', 'School', 'Institution Name')
+
+    if (!categoryName) return { label: `Row ${index + 2}`, payload: null, error: 'Missing category.' }
+    const match = categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase())
+    if (!match) {
+      return { label: title || `Row ${index + 2}`, payload: null, error: `Category "${categoryName}" doesn't exist — add it first, then re-import.` }
+    }
+    if (!title) return { label: `Row ${index + 2}`, payload: null, error: 'Missing project title.' }
+    if (!presenter) return { label: title, payload: null, error: 'Missing presenter/team name.' }
+
+    return {
+      label: title,
+      detail: `${presenter}${institution ? ' · ' + institution : ''} · ${match.name}`,
+      payload: { categoryId: match.id, title, presenter, institution },
+    }
+  }
 
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -49,7 +75,29 @@ export default function Categories() {
     <div className={styles.page}>
       <div className={styles.titleRow}>
         <h2 className={styles.title}>Categories & Projects</h2>
+        <button className={styles.importBtn} onClick={() => setShowImport(true)}>
+          Import Projects (CSV)
+        </button>
       </div>
+
+      {showImport && (
+        <CsvImportPanel<ProjectImportPayload>
+          title="Import Projects from CSV"
+          instructions={
+            <>
+              Columns: <code>Category</code> (must match an existing category name exactly), <code>Title</code>,{' '}
+              <code>Presenter</code>, and optionally <code>Institution</code>. Add categories first if they don't exist yet.
+            </>
+          }
+          templateHeaders={['Category', 'Title', 'Presenter', 'Institution']}
+          templateExampleRow={[categories[0]?.name ?? 'STEM', 'AI Waste Sorter', 'Jane Smith', 'University of Newcastle']}
+          templateFilename="fairn2-projects-template.csv"
+          parseRow={parseProjectRow}
+          onImportRow={addProject}
+          onDone={() => {}}
+          onClose={() => setShowImport(false)}
+        />
+      )}
 
       {/* Add category form */}
       <form className={styles.addCatForm} onSubmit={handleAddCategory}>

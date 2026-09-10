@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useAdmin } from '../context/AdminContext'
+import CsvImportPanel, { ParsedCsvRow } from '../components/CsvImportPanel'
+import { CSVRecord } from '../utils/csv'
 import styles from './Judges.module.css'
 
 export default function Judges() {
@@ -37,6 +39,40 @@ export default function Judges() {
   }
 
   const [saving, setSaving] = useState(false)
+  const [showImport, setShowImport] = useState(false)
+
+  type JudgeImportPayload = { name: string; email: string; accessCode: string; categoryId: number | null }
+
+  const parseJudgeRow = (record: CSVRecord, index: number): ParsedCsvRow<JudgeImportPayload> => {
+    const name = record.get('Name', 'Judge Name', 'Full Name')
+    const email = record.get('Email', 'Email Address')
+    const accessCode = record.get('AccessCode', 'Access Code', 'Code')
+    const categoryName = record.get('Category', 'Category Name')
+
+    if (!name) return { label: `Row ${index + 2}`, payload: null, error: 'Missing name.' }
+    if (!email || !email.includes('@')) return { label: name, payload: null, error: 'Missing or invalid email.' }
+    if (!/^\d{4}$/.test(accessCode)) return { label: name, payload: null, error: 'Access code must be exactly 4 digits.' }
+
+    let categoryId: number | null = null
+    let warning: string | undefined
+
+    if (categoryName) {
+      const match = categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase())
+      if (match) categoryId = match.id
+      else warning = `Category "${categoryName}" not found — will import without a category.`
+    }
+
+    if (judges.some(j => j.email.toLowerCase() === email.toLowerCase())) {
+      warning = (warning ? warning + ' Also: ' : '') + 'a judge with this email already exists — import will likely fail.'
+    }
+
+    return {
+      label: name,
+      detail: `${email} · code ${accessCode}${categoryName ? ' · ' + categoryName : ''}`,
+      payload: { name, email, accessCode, categoryId },
+      warning,
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -68,10 +104,34 @@ export default function Judges() {
     <div className={styles.page}>
       <div className={styles.titleRow}>
         <h2 className={styles.title}>Judges</h2>
-        <button className={styles.addBtn} onClick={() => { resetForm(); setShowForm(true) }}>
-          + Add Judge
-        </button>
+        <div className={styles.headerBtns}>
+          <button className={styles.importBtn} onClick={() => setShowImport(true)}>
+            Import CSV
+          </button>
+          <button className={styles.addBtn} onClick={() => { resetForm(); setShowForm(true) }}>
+            + Add Judge
+          </button>
+        </div>
       </div>
+
+      {showImport && (
+        <CsvImportPanel<JudgeImportPayload>
+          title="Import Judges from CSV"
+          instructions={
+            <>
+              Columns: <code>Name</code>, <code>Email</code>, <code>AccessCode</code> (4 digits), and optionally{' '}
+              <code>Category</code> (must match an existing category name exactly).
+            </>
+          }
+          templateHeaders={['Name', 'Email', 'AccessCode', 'Category']}
+          templateExampleRow={['Sarah Chen', 'sarah.chen@hunterwise.org', '1234', categories[0]?.name ?? 'STEM']}
+          templateFilename="fairn2-judges-template.csv"
+          parseRow={parseJudgeRow}
+          onImportRow={addJudge}
+          onDone={() => {}}
+          onClose={() => setShowImport(false)}
+        />
+      )}
 
       {/* Auto-assign section */}
       <div className={styles.autoAssignCard}>
