@@ -1,5 +1,5 @@
-import { useState, ReactNode } from 'react'
-import { csvToRecords, CSVRecord, downloadCSV, rowsToCSV } from '../utils/csv'
+import { useState, type ReactNode } from 'react'
+import { csvToRecords, downloadCSV, rowsToCSV, type CSVRecord } from '../utils/csv'
 import styles from './CsvImportPanel.module.css'
 
 export type ParsedCsvRow<T> = {

@@ -35,3 +35,42 @@ export function todayStamp(): string {
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
+
+/**
+ * Parse CSV text into an array of records keyed by header row.
+ * Handles quoted fields, escaped quotes (""), commas/newlines inside quotes,
+ * CRLF line endings, and a leading UTF-8 BOM (e.g. from Excel).
+ */
+export type CSVRecord = Record<string, string>
+
+export function csvToRecords(text: string): CSVRecord[] {
+  const input = text.replace(/^\uFEFF/, '');
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const c = input[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (input[i + 1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else field += c;
+    } else if (c === '"') inQuotes = true;
+    else if (c === ',') { row.push(field); field = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && input[i + 1] === '\n') i++;
+      row.push(field); rows.push(row); row = []; field = '';
+    } else field += c;
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+
+  const nonEmpty = rows.filter(r => r.some(v => v.trim() !== ''));
+  if (nonEmpty.length === 0) return [];
+
+  const headers = nonEmpty[0].map(h => h.trim());
+  return nonEmpty.slice(1).map(r =>
+    Object.fromEntries(headers.map((h, idx) => [h, (r[idx] ?? '').trim()]))
+  );
+}
