@@ -37,11 +37,23 @@ export function todayStamp(): string {
 }
 
 /**
+ * One parsed CSV row. Use get() with one or more accepted header names —
+ * matching ignores case, spaces, underscores and hyphens, so
+ * get('AccessCode', 'Access Code') matches "access code", "ACCESS_CODE", etc.
+ * Returns '' if none of the headers are present.
+ */
+export type CSVRecord = {
+  get: (...headerNames: string[]) => string
+  raw: Record<string, string>
+}
+
+const normHeader = (h: string) => h.toLowerCase().replace(/[\s_-]+/g, '')
+
+/**
  * Parse CSV text into an array of records keyed by header row.
  * Handles quoted fields, escaped quotes (""), commas/newlines inside quotes,
  * CRLF line endings, and a leading UTF-8 BOM (e.g. from Excel).
  */
-export type CSVRecord = Record<string, string>
 
 export function csvToRecords(text: string): CSVRecord[] {
   const input = text.replace(/^\uFEFF/, '');
@@ -70,7 +82,20 @@ export function csvToRecords(text: string): CSVRecord[] {
   if (nonEmpty.length === 0) return [];
 
   const headers = nonEmpty[0].map(h => h.trim());
-  return nonEmpty.slice(1).map(r =>
-    Object.fromEntries(headers.map((h, idx) => [h, (r[idx] ?? '').trim()]))
-  );
+  return nonEmpty.slice(1).map(r => {
+    const raw: Record<string, string> = Object.fromEntries(
+      headers.map((h, idx) => [h, (r[idx] ?? '').trim()])
+    );
+    const byNorm = new Map(headers.map((h, idx) => [normHeader(h), (r[idx] ?? '').trim()]));
+    return {
+      raw,
+      get: (...headerNames: string[]) => {
+        for (const name of headerNames) {
+          const v = byNorm.get(normHeader(name));
+          if (v !== undefined && v !== '') return v;
+        }
+        return '';
+      },
+    };
+  });
 }

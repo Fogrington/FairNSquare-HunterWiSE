@@ -24,10 +24,12 @@ CREATE TABLE admins (
 CREATE TABLE judges (
   id           SERIAL PRIMARY KEY,
   name         VARCHAR(255) NOT NULL,
-  email        VARCHAR(255) UNIQUE NOT NULL,
+  username     VARCHAR(50) NOT NULL,   -- login name, e.g. sarah.chen (no emails collected)
   access_code  CHAR(4) NOT NULL,
   category_id  INTEGER,               -- grouping hint (nullable)
-  created_at   TIMESTAMP DEFAULT NOW()
+  created_at   TIMESTAMP DEFAULT NOW(),
+  CONSTRAINT judges_username_key    UNIQUE (username),
+  CONSTRAINT judges_username_format CHECK (username ~ '^[a-z0-9]+([._-][a-z0-9]+)*$')
 );
 
 -- ─── Categories ───────────────────────────────────────────────────────────────
@@ -82,20 +84,23 @@ CREATE TABLE scores (
 
 -- ─── Seed data ────────────────────────────────────────────────────────────────
 
--- Admin user (password: admin123)
+-- Admin user — LOCAL DEV ONLY (password: changeme-local-dev).
+-- Production uses a different password: generate a hash with
+--   node -e "console.log(require('bcryptjs').hashSync(process.argv[1], 12))" 'NewPassword'
+-- and UPDATE admins SET password = '<hash>' WHERE email = '...';
 INSERT INTO admins (email, password, name) VALUES
-  ('admin@hunterwise.org', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'HunterWiSE Admin');
+  ('admin@hunterwise.org', '$2a$12$BgiTo.pgGAHcP01qXy14Du7CQ1a1ZrkQj0wKF3/lVe.9zWDSc4Vle', 'HunterWiSE Admin');
 
 -- Categories
 INSERT INTO categories (id, name) VALUES
   (1, 'Engineering & Technology'),
   (2, 'Life Sciences & Health');
 
--- Judges (access codes are plain 4-digit strings — hashed in production)
-INSERT INTO judges (id, name, email, access_code, category_id) VALUES
-  (1, 'Sarah Chen',  'sarah.chen@hunterwise.org',  '1234', 1),
-  (2, 'Marcus Webb', 'marcus.webb@hunterwise.org', '5678', 2),
-  (3, 'Priya Nair',  'priya.nair@hunterwise.org',  '9012', 1);
+-- Judges (access codes are plain 4-digit strings; login attempts are rate-limited)
+INSERT INTO judges (id, name, username, access_code, category_id) VALUES
+  (1, 'Sarah Chen',  'sarah.chen',  '1234', 1),
+  (2, 'Marcus Webb', 'marcus.webb', '5678', 2),
+  (3, 'Priya Nair',  'priya.nair',  '9012', 1);
 
 -- Projects
 INSERT INTO projects (id, category_id, title, presenter, institution, description) VALUES

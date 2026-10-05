@@ -1,6 +1,6 @@
 import express from 'express'
 import cors from 'cors'
-import dotenv from 'dotenv'
+import './config'   // loads .env and validates JWT_SECRET before anything else
 
 import authRoutes        from './routes/auth'
 import judgesRoutes      from './routes/judges'
@@ -9,10 +9,11 @@ import projectsRoutes    from './routes/projects'
 import assignmentsRoutes from './routes/assignments'
 import scoresRoutes      from './routes/scores'
 
-dotenv.config()
-
 const app = express()
 const PORT = process.env.PORT || 3000
+
+// Render sits behind one proxy — needed so rate limiting sees real client IPs
+app.set('trust proxy', 1)
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors({

@@ -4,6 +4,21 @@ import CsvImportPanel, { ParsedCsvRow } from '../components/CsvImportPanel'
 import { CSVRecord } from '../utils/csv'
 import styles from './Judges.module.css'
 
+// Judges log in with a username, not an email — we never contact them, so we
+// don't collect one. Format matches the backend rule: lowercase letters/digits
+// separated by . _ or -   e.g. "Sarah Chen" → sarah.chen
+const USERNAME_RE = /^[a-z0-9]+([._-][a-z0-9]+)*$/
+
+function suggestUsername(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')   // é → e
+    .replace(/[^a-z0-9]+/g, '.')                          // spaces/punctuation → .
+    .replace(/^\.+|\.+$/g, '')                           // trim stray dots
+    .slice(0, 50)
+}
+
 export default function Judges() {
   const {
     judges, categories, projects,
@@ -14,14 +29,17 @@ export default function Judges() {
 
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
-  const [form, setForm] = useState({ name: '', email: '', accessCode: '', categoryId: '' })
+  const [form, setForm] = useState({ name: '', username: '', accessCode: '', categoryId: '' })
+  // Once the admin edits the username by hand, stop auto-filling it from the name
+  const [usernameTouched, setUsernameTouched] = useState(false)
   const [formError, setFormError] = useState('')
 
   // Which judge's assignment panel is expanded
   const [expandedJudge, setExpandedJudge] = useState<number | null>(null)
 
   const resetForm = () => {
-    setForm({ name: '', email: '', accessCode: '', categoryId: '' })
+    setForm({ name: '', username: '', accessCode: '', categoryId: '' })
+    setUsernameTouched(false)
     setFormError('')
     setShowForm(false)
     setEditingId(null)
@@ -30,10 +48,11 @@ export default function Judges() {
   const handleEdit = (judge: typeof judges[0]) => {
     setForm({
       name: judge.name,
-      email: judge.email,
+      username: judge.username,
       accessCode: judge.accessCode,
       categoryId: judge.categoryId?.toString() ?? '',
     })
+    setUsernameTouched(true)   // keep an existing judge's username unless deliberately changed
     setEditingId(judge.id)
     setShowForm(true)
   }
@@ -41,16 +60,17 @@ export default function Judges() {
   const [saving, setSaving] = useState(false)
   const [showImport, setShowImport] = useState(false)
 
-  type JudgeImportPayload = { name: string; email: string; accessCode: string; categoryId: number | null }
+  type JudgeImportPayload = { name: string; username: string; accessCode: string; categoryId: number | null }
 
   const parseJudgeRow = (record: CSVRecord, index: number): ParsedCsvRow<JudgeImportPayload> => {
     const name = record.get('Name', 'Judge Name', 'Full Name')
-    const email = record.get('Email', 'Email Address')
+    // Username column is optional — if blank, generate one from the name
+    const username = (record.get('Username', 'User Name', 'Login') || suggestUsername(name)).trim().toLowerCase()
     const accessCode = record.get('AccessCode', 'Access Code', 'Code')
     const categoryName = record.get('Category', 'Category Name')
 
     if (!name) return { label: `Row ${index + 2}`, payload: null, error: 'Missing name.' }
-    if (!email || !email.includes('@')) return { label: name, payload: null, error: 'Missing or invalid email.' }
+    if (!USERNAME_RE.test(username)) return { label: name, payload: null, error: `Invalid username "${username}" — use lowercase letters, numbers and . _ - (e.g. sarah.chen).` }
     if (!/^\d{4}$/.test(accessCode)) return { label: name, payload: null, error: 'Access code must be exactly 4 digits.' }
 
     let categoryId: number | null = null
@@ -62,14 +82,14 @@ export default function Judges() {
       else warning = `Category "${categoryName}" not found — will import without a category.`
     }
 
-    if (judges.some(j => j.email.toLowerCase() === email.toLowerCase())) {
-      warning = (warning ? warning + ' Also: ' : '') + 'a judge with this email already exists — import will likely fail.'
+    if (judges.some(j => j.username === username)) {
+      warning = (warning ? warning + ' Also: ' : '') + `username "${username}" is already taken — import will fail. Add a Username column to set a different one.`
     }
 
     return {
       label: name,
-      detail: `${email} · code ${accessCode}${categoryName ? ' · ' + categoryName : ''}`,
-      payload: { name, email, accessCode, categoryId },
+      detail: `${username} · code ${accessCode}${categoryName ? ' · ' + categoryName : ''}`,
+      payload: { name, username, accessCode, categoryId },
       warning,
     }
   }
@@ -77,15 +97,19 @@ export default function Judges() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setFormError('')
-    if (!form.name.trim() || !form.email.trim() || !form.accessCode.trim()) {
-      setFormError('Name, email and access code are required.'); return
+    const username = form.username.trim().toLowerCase()
+    if (!form.name.trim() || !username || !form.accessCode.trim()) {
+      setFormError('Name, username and access code are required.'); return
+    }
+    if (!USERNAME_RE.test(username)) {
+      setFormError('Username can only use lowercase letters, numbers and . _ - (e.g. sarah.chen).'); return
     }
     if (form.accessCode.length !== 4 || !/^\d+$/.test(form.accessCode)) {
       setFormError('Access code must be exactly 4 digits.'); return
     }
     const payload = {
       name: form.name.trim(),
-      email: form.email.trim(),
+      username,
       accessCode: form.accessCode,
       categoryId: form.categoryId ? Number(form.categoryId) : null,
     }
@@ -119,12 +143,13 @@ export default function Judges() {
           title="Import Judges from CSV"
           instructions={
             <>
-              Columns: <code>Name</code>, <code>Email</code>, <code>AccessCode</code> (4 digits), and optionally{' '}
+              Columns: <code>Name</code>, <code>AccessCode</code> (4 digits), and optionally <code>Username</code>{' '}
+              (generated from the name if left blank, e.g. Sarah Chen → sarah.chen) and{' '}
               <code>Category</code> (must match an existing category name exactly).
             </>
           }
-          templateHeaders={['Name', 'Email', 'AccessCode', 'Category']}
-          templateExampleRow={['Sarah Chen', 'sarah.chen@hunterwise.org', '1234', categories[0]?.name ?? 'STEM']}
+          templateHeaders={['Name', 'Username', 'AccessCode', 'Category']}
+          templateExampleRow={['Sarah Chen', 'sarah.chen', '1234', categories[0]?.name ?? 'STEM']}
           templateFilename="fairn2-judges-template.csv"
           parseRow={parseJudgeRow}
           onImportRow={addJudge}
@@ -162,11 +187,27 @@ export default function Judges() {
             <div className={styles.formGrid}>
               <div className={styles.field}>
                 <label className={styles.label}>Full Name</label>
-                <input className={styles.input} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Jane Smith" />
+                <input
+                  className={styles.input}
+                  value={form.name}
+                  onChange={e => {
+                    const name = e.target.value
+                    setForm(f => ({ ...f, name, username: usernameTouched ? f.username : suggestUsername(name) }))
+                  }}
+                  placeholder="Jane Smith"
+                />
               </div>
               <div className={styles.field}>
-                <label className={styles.label}>Email</label>
-                <input className={styles.input} type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="jane@org.com" />
+                <label className={styles.label}>Username</label>
+                <input
+                  className={styles.input}
+                  value={form.username}
+                  onChange={e => { setUsernameTouched(true); setForm(f => ({ ...f, username: e.target.value.toLowerCase() })) }}
+                  placeholder="jane.smith"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                />
               </div>
               <div className={styles.field}>
                 <label className={styles.label}>Access Code (4 digits)</label>
@@ -195,7 +236,7 @@ export default function Judges() {
       <div className={styles.table}>
         <div className={styles.tableHeader}>
           <span>Name</span>
-          <span>Email</span>
+          <span>Username</span>
           <span>Code</span>
           <span>Category</span>
           <span>Assigned</span>
@@ -218,7 +259,7 @@ export default function Judges() {
             <div key={judge.id}>
               <div className={styles.tableRow}>
                 <span className={styles.judgeName}>{judge.name}</span>
-                <span className={styles.muted}>{judge.email}</span>
+                <span className={styles.muted}>{judge.username}</span>
                 <span className={styles.code}>{judge.accessCode}</span>
                 <span>
                   {cat

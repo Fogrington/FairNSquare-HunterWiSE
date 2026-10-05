@@ -1,11 +1,11 @@
-import { Router, Request, Response } from 'express'
+import { Router, Response } from 'express'
 import { pool } from '../db/connection'
 import { requireAdmin, AuthRequest } from '../middleware/auth'
 
 const router = Router()
 
-// GET /api/projects
-router.get('/', async (_req: Request, res: Response) => {
+// GET /api/projects (admin)
+router.get('/', requireAdmin, async (_req: AuthRequest, res: Response) => {
   try {
     const result = await pool.query(
       `SELECT p.*, c.name AS category_name

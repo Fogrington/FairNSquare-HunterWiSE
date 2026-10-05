@@ -66,7 +66,7 @@ export function adminLogin(email: string, password: string): Promise<AdminLoginR
 export type APIJudge = {
   id: number
   name: string
-  email: string
+  username: string
   access_code: string
   category_id: number | null
   category_name: string | null
@@ -74,10 +74,10 @@ export type APIJudge = {
 
 export const getJudges = () => request<APIJudge[]>('/judges')
 
-export const createJudge = (judge: { name: string; email: string; accessCode: string; categoryId: number | null }) =>
+export const createJudge = (judge: { name: string; username: string; accessCode: string; categoryId: number | null }) =>
   request<APIJudge>('/judges', { method: 'POST', body: JSON.stringify(judge) })
 
-export const updateJudgeAPI = (id: number, judge: { name: string; email: string; accessCode: string; categoryId: number | null }) =>
+export const updateJudgeAPI = (id: number, judge: { name: string; username: string; accessCode: string; categoryId: number | null }) =>
   request<APIJudge>(`/judges/${id}`, { method: 'PUT', body: JSON.stringify(judge) })
 
 export const deleteJudge = (id: number) =>

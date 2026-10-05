@@ -1,11 +1,11 @@
-import { Router, Request, Response } from 'express'
+import { Router, Response } from 'express'
 import { pool } from '../db/connection'
 import { requireAdmin, AuthRequest } from '../middleware/auth'
 
 const router = Router()
 
-// GET /api/categories
-router.get('/', async (_req: Request, res: Response) => {
+// GET /api/categories (admin)
+router.get('/', requireAdmin, async (_req: AuthRequest, res: Response) => {
   try {
     const result = await pool.query('SELECT * FROM categories ORDER BY name')
     res.json(result.rows)
@@ -42,8 +42,8 @@ router.delete('/:id', requireAdmin, async (req: AuthRequest, res: Response) => {
   }
 })
 
-// GET /api/categories/:id/projects
-router.get('/:id/projects', async (req: Request, res: Response) => {
+// GET /api/categories/:id/projects (admin)
+router.get('/:id/projects', requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const result = await pool.query(
       'SELECT * FROM projects WHERE category_id=$1 ORDER BY title',
@@ -56,8 +56,8 @@ router.get('/:id/projects', async (req: Request, res: Response) => {
   }
 })
 
-// GET /api/categories/:id/results — ranked results for a category
-router.get('/:id/results', async (req: Request, res: Response) => {
+// GET /api/categories/:id/results — ranked results for a category (admin)
+router.get('/:id/results', requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const result = await pool.query(
       `SELECT

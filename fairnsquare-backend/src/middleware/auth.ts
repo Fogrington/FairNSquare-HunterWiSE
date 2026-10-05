@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
+import { JWT_SECRET } from '../config'
 
 export interface AuthRequest extends Request {
   judgeId?: number
@@ -7,32 +8,32 @@ export interface AuthRequest extends Request {
   role?: 'judge' | 'admin'
 }
 
-export function requireJudge(req: AuthRequest, res: Response, next: NextFunction) {
-  const token = req.headers.authorization?.split(' ')[1]
-  if (!token) return res.status(401).json({ error: 'No token provided' })
+type TokenPayload = { id: number; role: 'judge' | 'admin' }
 
+function readToken(req: Request): TokenPayload | null {
+  const token = req.headers.authorization?.split(' ')[1]
+  if (!token) return null
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET || '') as any
-    if (payload.role !== 'judge') return res.status(403).json({ error: 'Judge access required' })
-    req.judgeId = payload.id
-    req.role = 'judge'
-    next()
+    return jwt.verify(token, JWT_SECRET) as TokenPayload
   } catch {
-    res.status(401).json({ error: 'Invalid or expired token' })
+    return null
   }
 }
 
-export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
-  const token = req.headers.authorization?.split(' ')[1]
-  if (!token) return res.status(401).json({ error: 'No token provided' })
+export function requireJudge(req: AuthRequest, res: Response, next: NextFunction) {
+  const payload = readToken(req)
+  if (!payload) return res.status(401).json({ error: 'Invalid or expired token' })
+  if (payload.role !== 'judge') return res.status(403).json({ error: 'Judge access required' })
+  req.judgeId = payload.id
+  req.role = 'judge'
+  next()
+}
 
-  try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET || '') as any
-    if (payload.role !== 'admin') return res.status(403).json({ error: 'Admin access required' })
-    req.adminId = payload.id
-    req.role = 'admin'
-    next()
-  } catch {
-    res.status(401).json({ error: 'Invalid or expired token' })
-  }
+export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+  const payload = readToken(req)
+  if (!payload) return res.status(401).json({ error: 'Invalid or expired token' })
+  if (payload.role !== 'admin') return res.status(403).json({ error: 'Admin access required' })
+  req.adminId = payload.id
+  req.role = 'admin'
+  next()
 }

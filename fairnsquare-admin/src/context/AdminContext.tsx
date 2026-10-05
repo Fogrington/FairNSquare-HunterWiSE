@@ -16,7 +16,7 @@ export type Project = {
 export type Judge = {
   id: number
   name: string
-  email: string
+  username: string
   accessCode: string
   categoryId: number | null   // grouping hint only
 }
@@ -32,7 +32,7 @@ export type JudgeProjectAssignment = {
 const mapJudge = (j: api.APIJudge): Judge => ({
   id: j.id,
   name: j.name,
-  email: j.email,
+  username: j.username,
   accessCode: j.access_code,
   categoryId: j.category_id,
 })
@@ -165,7 +165,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     const merged = { ...existing, ...updates }
     const updated = await api.updateJudgeAPI(id, {
       name: merged.name,
-      email: merged.email,
+      username: merged.username,
       accessCode: merged.accessCode,
       categoryId: merged.categoryId,
     })
