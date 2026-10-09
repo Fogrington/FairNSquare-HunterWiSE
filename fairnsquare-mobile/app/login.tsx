@@ -16,21 +16,21 @@ export default function LoginScreen() {
   const { login, loading, error } = useAuth();
   const router = useRouter();
 
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [accessCode, setAccessCode] = useState('');
   const [localError, setLocalError] = useState('');
 
   const handleLogin = async () => {
     setLocalError('');
-    if (!email.trim() || !accessCode.trim()) {
-      setLocalError('Please enter your email and access code.');
+    if (!username.trim() || !accessCode.trim()) {
+      setLocalError('Please enter your username and access code.');
       return;
     }
-    const success = await login(email.trim(), accessCode.trim());
+    const success = await login(username.trim().toLowerCase(), accessCode.trim());
     if (success) {
       router.replace('/(tabs)' as any);
     } else {
-      setLocalError(error || 'Invalid email or access code.');
+      setLocalError(error || 'Invalid username or access code.');
     }
   };
 
@@ -48,16 +48,17 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.formSection}>
-          <Text style={styles.label}>Email Address</Text>
+          <Text style={styles.label}>Username</Text>
           <TextInput
             style={styles.input}
-            placeholder="you@organisation.com"
+            placeholder="e.g. sarah.chen"
             placeholderTextColor="#90A4AE"
-            keyboardType="email-address"
             autoCapitalize="none"
-            autoComplete="email"
-            value={email}
-            onChangeText={setEmail}
+            autoCorrect={false}
+            autoComplete="username"
+            textContentType="username"
+            value={username}
+            onChangeText={setUsername}
             editable={!loading}
           />
 

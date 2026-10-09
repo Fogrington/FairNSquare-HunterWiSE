@@ -12,14 +12,14 @@ import {
   getStoredJudgeProfile,
   APIProject,
   APICriterion,
-} from '@/services/api';
+} from '../services/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type Judge = {
   id: number;
   name: string;
-  email: string;
+  username: string;
   categoryId: number | null;
   categoryName: string | null;
 };
@@ -54,7 +54,7 @@ type AuthContextType = {
   loading: boolean;
   restoring: boolean;
   error: string | null;
-  login: (email: string, accessCode: string) => Promise<boolean>;
+  login: (username: string, accessCode: string) => Promise<boolean>;
   logout: () => void;
   submitScore: (projectId: number, criterionId: number, value: number) => Promise<void>;
   getScoreFor: (projectId: number, criterionId: number) => number | null;
@@ -91,11 +91,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Fetches everything a logged-in judge needs: their assigned projects,
   // the scoring criteria, and any scores they've already submitted
   // (so re-opening the app mid-event doesn't lose their progress).
-  const loadJudgeData = async (judgeId: number) => {
+  const loadJudgeData = async () => {
     const [rawProjects, rawCriteria, rawScores] = await Promise.all([
-      getAssignedProjects(judgeId),
+      getAssignedProjects(),
       getCriteria(),
-      getJudgeScores(judgeId),
+      getJudgeScores(),
     ]);
 
     setProjects(rawProjects.map(mapProject));
@@ -116,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!token || !storedJudge) return;
 
         setJudge(storedJudge);
-        await loadJudgeData(storedJudge.id);
+        await loadJudgeData();
       } catch (err) {
         // Token expired/invalid, or the server rejected a request —
         // fall back to a clean logged-out state.
@@ -131,15 +131,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
-  const login = async (email: string, accessCode: string): Promise<boolean> => {
+  const login = async (username: string, accessCode: string): Promise<boolean> => {
     setLoading(true);
     setError(null);
     try {
-      const res = await judgeLogin(email, accessCode);
+      const res = await judgeLogin(username, accessCode);
       await saveToken(res.token);
       await saveJudgeProfile(res.judge);
       setJudge(res.judge);
-      await loadJudgeData(res.judge.id);
+      await loadJudgeData();
       return true;
     } catch (err: any) {
       setError(err.message || 'Login failed');

@@ -8,8 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 //const API_BASE = 'http://192.168.0.185:3000/api'
 // changed to this API_URL constant to use the environment variable from .env file
 // and to do automatically for while publishing and moving away from Expo
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://192.168.x.x:3000'
-console.log('API:', process.env.EXPO_PUBLIC_API_URL)
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://192.168.x.x:3000/api'
 
 const TOKEN_KEY = 'fairn2_judge_token'
 const JUDGE_KEY = 'fairn2_judge_profile'
@@ -34,7 +33,7 @@ export async function clearToken() {
 export type StoredJudge = {
   id: number
   name: string
-  email: string
+  username: string
   categoryId: number | null
   categoryName: string | null
 }
@@ -89,19 +88,19 @@ export type JudgeLoginResponse = {
   judge: {
     id: number
     name: string
-    email: string
+    username: string
     categoryId: number | null
     categoryName: string | null
   }
 }
 
 export async function judgeLogin(
-  email: string,
+  username: string,
   accessCode: string
 ): Promise<JudgeLoginResponse> {
   return request<JudgeLoginResponse>('/auth/judge/login', {
     method: 'POST',
-    body: JSON.stringify({ email, accessCode }),
+    body: JSON.stringify({ username, accessCode }),
   })
 }
 
@@ -116,8 +115,9 @@ export type APIProject = {
   description: string
 }
 
-export async function getAssignedProjects(judgeId: number): Promise<APIProject[]> {
-  return request<APIProject[]>(`/judges/${judgeId}/projects`)
+// The backend identifies the judge from the token, so no id in the URL
+export async function getAssignedProjects(): Promise<APIProject[]> {
+  return request<APIProject[]>('/judges/me/projects')
 }
 
 // ─── Scores ───────────────────────────────────────────────────────────────────
@@ -155,6 +155,6 @@ export type APIJudgeScore = {
   submitted_at: string
 }
 
-export async function getJudgeScores(judgeId: number): Promise<APIJudgeScore[]> {
-  return request<APIJudgeScore[]>(`/judges/${judgeId}/scores`)
+export async function getJudgeScores(): Promise<APIJudgeScore[]> {
+  return request<APIJudgeScore[]>('/judges/me/scores')
 }
