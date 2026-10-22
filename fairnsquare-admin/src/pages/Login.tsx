@@ -38,7 +38,7 @@ export default function Login() {
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
-            placeholder="admin@hunterwise.org"
+            placeholder="admin@admin.admin"
             autoComplete="email"
           />
 
@@ -58,10 +58,6 @@ export default function Login() {
           </button>
         </form>
 
-        <div className={styles.devHint}>
-          <span className={styles.devLabel}>Dev credentials</span>
-          <span>admin@hunterwise.org / admin123</span>
-        </div>
       </div>
 
       <div className={styles.footerBrand}>

@@ -1,8 +1,8 @@
 // ─── Config ───────────────────────────────────────────────────────────────────
 // Admin panel runs in a browser on the same machine as the backend during dev.
 // If you ever need to hit a backend on another machine, change this to that
-// machine's LAN IP, e.g. 'http://192.168.1.x:3000/api'
-const API_BASE = 'http://localhost:3000/api'
+// machine's LAN IP, e.g. 'http://192.168.1.x:3000/api' 
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api'
 
 const TOKEN_KEY = 'fairn2_admin_token'
 
