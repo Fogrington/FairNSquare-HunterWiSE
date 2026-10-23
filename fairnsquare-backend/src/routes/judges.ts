@@ -1,6 +1,7 @@
 import { Router, Response } from 'express'
 import { pool } from '../db/connection'
 import { requireAdmin, requireJudge, AuthRequest } from '../middleware/auth'
+import { isJudgingOpen, JUDGING_CLOSED_RESPONSE } from '../db/event'
 
 const router = Router()
 
@@ -31,7 +32,7 @@ function validateJudge(body: any): { error: string } | {
 router.get('/me/projects', requireJudge, async (req: AuthRequest, res: Response) => {
   try {
     const result = await pool.query(
-      `SELECT p.*, c.name AS category_name
+      `SELECT p.*, c.name AS category_name, jp.comment
        FROM projects p
        JOIN judge_project jp ON jp.project_id = p.id
        JOIN categories c ON c.id = p.category_id
@@ -40,6 +41,40 @@ router.get('/me/projects', requireJudge, async (req: AuthRequest, res: Response)
       [req.judgeId]
     )
     res.json(result.rows)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+const MAX_COMMENT_LENGTH = 2000
+
+// PUT /api/judges/me/projects/:projectId/comment — save the judge's written feedback
+router.put('/me/projects/:projectId/comment', requireJudge, async (req: AuthRequest, res: Response) => {
+  const projectId = Number(req.params.projectId)
+  const comment = typeof req.body?.comment === 'string' ? req.body.comment.trim() : null
+
+  if (!Number.isInteger(projectId)) return res.status(400).json({ error: 'Invalid project' })
+  if (comment === null) return res.status(400).json({ error: 'comment must be text' })
+  if (comment.length > MAX_COMMENT_LENGTH) {
+    return res.status(400).json({ error: `Comments can be at most ${MAX_COMMENT_LENGTH} characters` })
+  }
+
+  try {
+    if (!(await isJudgingOpen())) {
+      return res.status(403).json(JUDGING_CLOSED_RESPONSE)
+    }
+    const result = await pool.query(
+      `UPDATE judge_project
+       SET comment = $3, comment_updated_at = NOW()
+       WHERE judge_id = $1 AND project_id = $2
+       RETURNING project_id, comment, comment_updated_at`,
+      [req.judgeId, projectId, comment || null]
+    )
+    if (result.rows.length === 0) {
+      return res.status(403).json({ error: 'You are not assigned to this project' })
+    }
+    res.json(result.rows[0])
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Server error' })

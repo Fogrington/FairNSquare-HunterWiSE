@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAdmin } from '../context/AdminContext'
 import * as api from '../services/api'
 import { rowsToCSV, downloadCSV, todayStamp } from '../utils/csv'
@@ -16,8 +17,8 @@ type ResultRow = {
 type JudgeBreakdownRow = {
   judgeId: number
   judgeName: string
-  scores: { criterionId: number; label: string; value: number; weight: number }[]
-  weighted: number
+  scores: { criterionId: number; label: string; value: number }[]
+  total: number
 }
 
 export default function Results() {
@@ -25,12 +26,20 @@ export default function Results() {
   const [selectedCat, setSelectedCat] = useState<number>(0)
   const [results, setResults] = useState<ResultRow[]>([])
   const [breakdowns, setBreakdowns] = useState<Record<number, JudgeBreakdownRow[]>>({})
+  const [commentsByProject, setCommentsByProject] = useState<Record<number, api.APIComment[]>>({})
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [exporting, setExporting] = useState<'category' | 'all' | null>(null)
   const [exportError, setExportError] = useState('')
+  const [criteria, setCriteria] = useState<api.APICriterion[]>([])
+  const maxTotal = api.maxTotalOf(criteria)
 
-  const CSV_HEADER = ['Rank', 'Project Title', 'Presenter / Team', 'Institution', 'Score (out of 10)', 'Judges Scored']
+  useEffect(() => {
+    api.getCriteria().then(setCriteria).catch(() => {})
+  }, [])
+
+  const CSV_HEADER = ['Rank', 'Project Title', 'Presenter / Team', 'Institution', `Average Score (out of ${maxTotal || '?'})`, 'Judges Scored']
 
   const resultRowToCSV = (r: ResultRow, rank: number): (string | number)[] => [
     rank,
@@ -131,21 +140,27 @@ export default function Results() {
           const byJudge: Record<number, JudgeBreakdownRow> = {}
           for (const s of scores) {
             if (!byJudge[s.judge_id]) {
-              byJudge[s.judge_id] = { judgeId: s.judge_id, judgeName: s.judge_name, scores: [], weighted: 0 }
+              byJudge[s.judge_id] = { judgeId: s.judge_id, judgeName: s.judge_name, scores: [], total: 0 }
             }
             byJudge[s.judge_id].scores.push({
               criterionId: s.criterion_id,
               label: s.criterion_label,
               value: s.value,
-              weight: Number(s.weight),
             })
           }
           Object.values(byJudge).forEach(j => {
-            j.weighted = j.scores.reduce((sum, s) => sum + s.value * s.weight, 0)
+            j.total = j.scores.reduce((sum, s) => sum + s.value, 0)
           })
           byProject[projectId] = Object.values(byJudge)
         }
         setBreakdowns(byProject)
+
+        // Judges' written comments, grouped by project
+        const allComments = await api.getAllComments()
+        if (cancelled) return
+        const grouped: Record<number, api.APIComment[]> = {}
+        for (const c of allComments) (grouped[c.project_id] ??= []).push(c)
+        setCommentsByProject(grouped)
       } catch (err: any) {
         if (!cancelled) setError(err.message || 'Could not load results.')
       } finally {
@@ -162,6 +177,9 @@ export default function Results() {
       <div className={styles.titleRow}>
         <h2 className={styles.title}>Results</h2>
         <div className={styles.exportButtons}>
+          <button className={styles.exportBtn} onClick={() => navigate('/print')}>
+            Print Results
+          </button>
           <button
             className={styles.exportBtn}
             onClick={handleExportCategory}
@@ -201,6 +219,7 @@ export default function Results() {
 
       {!loading && !error && results.map((project, idx) => {
         const judgeBreakdown = breakdowns[project.projectId] ?? []
+        const projectComments = commentsByProject[project.projectId] ?? []
         const isFirst = idx === 0 && project.average !== null
         return (
           <div key={project.projectId} className={`${styles.projectCard} ${isFirst ? styles.projectCardTop : ''}`}>
@@ -217,7 +236,7 @@ export default function Results() {
                 {project.average !== null ? (
                   <>
                     <span className={styles.scoreValue}>{project.average.toFixed(2)}</span>
-                    <span className={styles.scoreMax}>/10</span>
+                    <span className={styles.scoreMax}>/{maxTotal}</span>
                   </>
                 ) : (
                   <span className={styles.noScore}>Not yet scored</span>
@@ -230,7 +249,7 @@ export default function Results() {
             {project.average !== null && (
               <div className={styles.barContainer}>
                 <div className={styles.barTrack}>
-                  <div className={styles.barFill} style={{ width: `${(project.average / 10) * 100}%` }} />
+                  <div className={styles.barFill} style={{ width: `${maxTotal ? (project.average / maxTotal) * 100 : 0}%` }} />
                 </div>
               </div>
             )}
@@ -239,7 +258,7 @@ export default function Results() {
             {judgeBreakdown.length > 0 && (
               <div className={styles.breakdown}>
                 {judgeBreakdown.map(j => {
-                  const complete = j.scores.length >= 4
+                  const complete = criteria.length > 0 && j.scores.length >= criteria.length
                   return (
                     <div key={j.judgeId} className={styles.judgeRow}>
                       <span className={styles.judgeName}>{j.judgeName}</span>
@@ -251,11 +270,23 @@ export default function Results() {
                         ))}
                       </div>
                       <span className={styles.judgeTotal}>
-                        {complete ? `${j.weighted.toFixed(2)}/10` : '—'}
+                        {complete ? `${j.total}/${maxTotal}` : 'Incomplete'}
                       </span>
                     </div>
                   )
                 })}
+              </div>
+            )}
+
+            {/* Judge comments */}
+            {projectComments.length > 0 && (
+              <div className={styles.comments}>
+                <span className={styles.commentsLabel}>Judge comments</span>
+                {projectComments.map(c => (
+                  <p key={c.judge_id} className={styles.comment}>
+                    “{c.comment}” <span className={styles.commentJudge}>— {c.judge_name}</span>
+                  </p>
+                ))}
               </div>
             )}
           </div>

@@ -1,7 +1,8 @@
 // ─── Config ───────────────────────────────────────────────────────────────────
-// Admin panel runs in a browser on the same machine as the backend during dev.
-// If you ever need to hit a backend on another machine, change this to that
-// machine's LAN IP, e.g. 'http://192.168.1.x:3000/api' 
+// Set VITE_API_URL in fairnsquare-admin/.env.local (dev) or in the hosting
+// provider's environment settings (production), e.g.
+//   VITE_API_URL=https://fairnsquare-hunterwise.onrender.com/api
+// Falls back to a local backend if it isn't set.
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api'
 
 const TOKEN_KEY = 'fairn2_admin_token'
@@ -166,6 +167,39 @@ export type APIScoreDetail = {
 export const getProjectScores = (projectId: number) =>
   request<APIScoreDetail[]>(`/scores/project/${projectId}`)
 
-export type APICriterion = { id: number; label: string; description: string; weight: number }
+export type APICriterion = {
+  id: number
+  label: string
+  description: string
+  weight: number
+  max_score: number          // scores run 1..max_score
+  low_label: string | null   // what a score of 1 means
+}
+
+// Highest possible total for one judge's scorecard (e.g. 6 questions × 5 = 30)
+export const maxTotalOf = (criteria: APICriterion[]) =>
+  criteria.reduce((sum, c) => sum + Number(c.max_score), 0)
 
 export const getCriteria = () => request<APICriterion[]>('/scores/criteria')
+
+// ─── Judging status (open / closed) ───────────────────────────────────────────
+
+export type EventStatus = { judgingOpen: boolean; closedAt: string | null }
+
+export const getEventStatus = () => request<EventStatus>('/event/status')
+
+export const closeJudging = () => request<EventStatus>('/event/close', { method: 'POST' })
+
+export const reopenJudging = () => request<EventStatus>('/event/open', { method: 'POST' })
+
+// ─── Judge comments ───────────────────────────────────────────────────────────
+
+export type APIComment = {
+  project_id: number
+  judge_id: number
+  judge_name: string
+  comment: string
+  comment_updated_at: string
+}
+
+export const getAllComments = () => request<APIComment[]>('/scores/comments')

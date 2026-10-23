@@ -3,6 +3,7 @@
 --   psql -U postgres -d fairn2 -f schema.sql
 
 -- ─── Drop existing tables (for clean reset) ───────────────────────────────────
+DROP TABLE IF EXISTS event_settings CASCADE;
 DROP TABLE IF EXISTS scores CASCADE;
 DROP TABLE IF EXISTS judge_project CASCADE;
 DROP TABLE IF EXISTS projects CASCADE;
@@ -60,7 +61,9 @@ CREATE TABLE criteria (
   id      SERIAL PRIMARY KEY,
   label   VARCHAR(255) NOT NULL,
   description TEXT,
-  weight  NUMERIC(4,2) NOT NULL  -- e.g. 0.30
+  weight  NUMERIC(4,2) NOT NULL DEFAULT 1.00,  -- kept for compatibility; results are unweighted
+  max_score INTEGER NOT NULL DEFAULT 5,        -- scores run 1..max_score
+  low_label TEXT                               -- what a score of 1 means
 );
 
 -- ─── Judge–Project assignments (junction table) ───────────────────────────────
@@ -68,8 +71,18 @@ CREATE TABLE judge_project (
   judge_id    INTEGER NOT NULL REFERENCES judges(id) ON DELETE CASCADE,
   project_id  INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   assigned_at TIMESTAMP DEFAULT NOW(),
+  comment            TEXT,           -- judge's optional written feedback
+  comment_updated_at TIMESTAMPTZ,
   PRIMARY KEY (judge_id, project_id)
 );
+
+-- ─── Event settings (single row: is judging open?) ────────────────────────────
+CREATE TABLE event_settings (
+  id            INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  judging_open  BOOLEAN NOT NULL DEFAULT TRUE,
+  closed_at     TIMESTAMPTZ
+);
+INSERT INTO event_settings (id, judging_open) VALUES (1, TRUE);
 
 -- ─── Scores ───────────────────────────────────────────────────────────────────
 CREATE TABLE scores (
@@ -77,7 +90,7 @@ CREATE TABLE scores (
   judge_id    INTEGER NOT NULL REFERENCES judges(id) ON DELETE CASCADE,
   project_id  INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   criterion_id INTEGER NOT NULL REFERENCES criteria(id) ON DELETE CASCADE,
-  value       INTEGER NOT NULL CHECK (value >= 1 AND value <= 10),
+  value       INTEGER NOT NULL CHECK (value >= 1),  -- upper limit = criteria.max_score (checked by backend)
   submitted_at TIMESTAMP DEFAULT NOW(),
   UNIQUE (judge_id, project_id, criterion_id)  -- one score per judge/project/criterion
 );
@@ -113,11 +126,14 @@ INSERT INTO projects (id, category_id, title, presenter, institution, descriptio
   (203, 2, 'GlucoWatch: Non-Invasive BGL Monitor',   'Fatima Al-Hassan','Hunter Medical Research Institute','Wearable using near-infrared spectroscopy to estimate blood glucose levels without skin puncture.');
 
 -- Criteria
-INSERT INTO criteria (id, label, description, weight) VALUES
-  (1, 'Innovation',      'Originality and novelty of the approach',      0.30),
-  (2, 'Technical Merit', 'Soundness of methodology and execution',        0.30),
-  (3, 'Impact',          'Potential real-world benefit and scalability',  0.25),
-  (4, 'Presentation',    'Clarity and professionalism of delivery',       0.15);
+-- HunterWiSE poster rubric: 6 questions, 1–5 each, total /30
+INSERT INTO criteria (id, label, description, weight, max_score, low_label) VALUES
+  (1, 'Problem',           'Did the team identify a real problem in their community and do a good job explaining it?', 1.00, 5, 'No problem identified'),
+  (2, 'Solution fit',      'Does the solution address the problem they identified?', 1.00, 5, 'No solution identified'),
+  (3, 'STEM application',  'Does the solution demonstrate a great application of science, technology, engineering or mathematics (STEM)?', 1.00, 5, 'No solution identified'),
+  (4, 'Description',       'Is the solution well-described in the poster?', 1.00, 5, 'No solution described'),
+  (5, 'End-user analysis', 'Is there end-user analysis of the solution?', 1.00, 5, 'No end-user analysis'),
+  (6, 'Community use',     'Can you see this solution being used in the community?', 1.00, 5, 'Probably not');
 
 -- Initial assignments
 INSERT INTO judge_project (judge_id, project_id) VALUES

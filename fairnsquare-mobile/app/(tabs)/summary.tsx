@@ -18,14 +18,16 @@ export default function SummaryScreen() {
   const completedProjects = projects.filter((p) => isProjectComplete(p.id));
   const allDone = completedProjects.length === projects.length && projects.length > 0;
 
-  const weightedScore = (projectId: number): string => {
+  // Rubric total: plain sum of question scores, e.g. "22/30"
+  const maxTotal = criteria.reduce((sum, c) => sum + c.max_score, 0);
+  const totalScore = (projectId: number): string => {
     let total = 0;
     for (const c of criteria) {
       const s = getScoreFor(projectId, c.id);
       if (s === null) return '—';
-      total += s * c.weight;
+      total += s;
     }
-    return total.toFixed(2);
+    return `${total}/${maxTotal}`;
   };
 
   return (
@@ -50,7 +52,7 @@ export default function SummaryScreen() {
         ) : (
           projects.map((project) => {
             const complete = isProjectComplete(project.id);
-            const ws = weightedScore(project.id);
+            const ws = totalScore(project.id);
             return (
               <View key={project.id} style={[styles.card, !complete && styles.cardIncomplete]}>
                 <View style={styles.cardHeader}>
@@ -66,7 +68,7 @@ export default function SummaryScreen() {
                       <View key={c.id} style={styles.breakdownRow}>
                         <Text style={styles.criterionName}>{c.label}</Text>
                         <Text style={[styles.criterionScore, s === null && styles.criterionScoreEmpty]}>
-                          {s !== null ? `${s}/10` : '—'}
+                          {s !== null ? `${s}/${c.max_score}` : '—'}
                         </Text>
                       </View>
                     );

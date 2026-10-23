@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AdminProvider, useAdmin } from './context/AdminContext'
 import Sidebar from './components/Sidebar'
 import Login from './pages/Login'
@@ -6,12 +6,17 @@ import Dashboard from './pages/Dashboard'
 import Judges from './pages/Judges'
 import Categories from './pages/Categories'
 import Results from './pages/Results'
+import PrintResults from './pages/PrintResults'
 import './App.css'
 
 function AppShell() {
   const { admin } = useAdmin()
+  const location = useLocation()
 
   if (!admin) return <Login />
+
+  // Printable results render full-page, without the sidebar
+  if (location.pathname === '/print') return <PrintResults />
 
   return (
     <div className="layout">

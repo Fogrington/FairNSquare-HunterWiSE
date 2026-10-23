@@ -8,6 +8,7 @@ import categoriesRoutes  from './routes/categories'
 import projectsRoutes    from './routes/projects'
 import assignmentsRoutes from './routes/assignments'
 import scoresRoutes      from './routes/scores'
+import eventRoutes       from './routes/event'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -35,6 +36,7 @@ app.use('/api/categories',  categoriesRoutes)
 app.use('/api/projects',    projectsRoutes)
 app.use('/api/assignments', assignmentsRoutes)
 app.use('/api/scores',      scoresRoutes)
+app.use('/api/event',       eventRoutes)
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {

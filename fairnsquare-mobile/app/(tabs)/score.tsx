@@ -6,15 +6,29 @@ import {
   StyleSheet,
   Platform,
   Alert,
+  TextInput,
+  ActivityIndicator,
+  KeyboardAvoidingView,
 } from 'react-native';
+import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
 
-function ScoreSlider({ value, onChange }: { value: number | null; onChange: (v: number) => void }) {
+const MAX_COMMENT = 2000;
+
+// Turns an API error into a title + message a judge can act on
+function describeError(err: any, action: string): [string, string] {
+  if (err?.code === 'JUDGING_CLOSED') {
+    return ['Judging has closed', 'Scores and comments can no longer be changed. Thanks for judging!'];
+  }
+  return [`${action} failed`, err?.message || 'Something went wrong. Please try again.'];
+}
+
+function ScoreSlider({ value, max, onChange }: { value: number | null; max: number; onChange: (v: number) => void }) {
   return (
     <View style={styles.sliderRow}>
-      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => {
+      {Array.from({ length: max }, (_, i) => i + 1).map((n) => {
         const selected = value === n;
         return (
           <TouchableOpacity
@@ -35,11 +49,22 @@ function ScoreSlider({ value, onChange }: { value: number | null; onChange: (v: 
 
 export default function ScoreScreen() {
   const { projectId } = useLocalSearchParams<{ projectId: string }>();
-  const { submitScore, getScoreFor, isProjectComplete, projects, criteria } = useAuth();
+  const {
+    submitScore, saveComment, verifyProjectSaved,
+    getScoreFor, isProjectComplete, projects, criteria,
+  } = useAuth();
   const router = useRouter();
 
   const id = Number(projectId);
   const project = projects.find((p) => p.id === id);
+
+  // The Score tab is reused for every project, so reload the comment box
+  // whenever a different project is opened.
+  const [comment, setComment] = useState(project?.comment ?? '');
+  const [submitting, setSubmitting] = useState(false);
+  useEffect(() => {
+    setComment(project?.comment ?? '');
+  }, [id]);
 
   if (!project) {
     return (
@@ -56,33 +81,71 @@ export default function ScoreScreen() {
 
   const allScored = isProjectComplete(project.id);
 
-  const handleSubmit = () => {
-    if (!allScored) {
-      Alert.alert('Incomplete', 'Please score all criteria before submitting.');
-      return;
-    }
-    Alert.alert(
-      'Scores Submitted',
-      `Your scores for "${project.title}" have been recorded.`,
-      [{ text: 'OK', onPress: () => router.push('/(tabs)' as any) }]
-    );
+  const handleScore = (criterionId: number, value: number) => {
+    submitScore(project.id, criterionId, value).catch((err) => {
+      const [title, message] = describeError(err, 'Saving that score');
+      Alert.alert(title, err?.code === 'JUDGING_CLOSED' ? message : `${message}\n\nPlease tap the score again.`);
+    });
   };
 
-  const weightedTotal = () => {
+  const handleSubmit = async () => {
+    if (!allScored) {
+      Alert.alert('Incomplete', 'Please answer every question before submitting.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      if (comment.trim() !== (project.comment ?? '')) {
+        await saveComment(project.id, comment);
+      }
+      // Only tell the judge it worked once the server confirms every score
+      const saved = await verifyProjectSaved(project.id);
+      if (!saved) {
+        Alert.alert(
+          'Some scores did not save',
+          'The screen now shows what the server has. Please re-check your scores and tap Submit again.'
+        );
+        return;
+      }
+      Alert.alert(
+        'Scores Submitted',
+        `Your scores for "${project.title}" have been saved.`,
+        [{ text: 'OK', onPress: () => router.push('/(tabs)' as any) }]
+      );
+    } catch (err) {
+      const [title, message] = describeError(err, 'Submitting');
+      Alert.alert(title, message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Rubric total: plain sum of the question scores (e.g. out of 30)
+  const maxTotal = criteria.reduce((sum, c) => sum + c.max_score, 0);
+  const maxPerQuestion = criteria.length ? Math.max(...criteria.map((c) => c.max_score)) : 5;
+  const runningTotal = () => {
     let total = 0;
     for (const c of criteria) {
       const s = getScoreFor(project.id, c.id);
       if (s === null) return null;
-      total += s * c.weight;
+      total += s;
     }
-    return total.toFixed(2);
+    return total;
   };
 
-  const total = weightedTotal();
+  const total = runningTotal();
 
   return (
-    <View style={styles.outer}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <KeyboardAvoidingView
+      style={styles.outer}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+    >
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Project header */}
         <View style={styles.projectHeader}>
           <TouchableOpacity onPress={() => router.push('/(tabs)' as any)} style={styles.backLink}>
@@ -95,36 +158,60 @@ export default function ScoreScreen() {
         </View>
 
         <Text style={styles.sectionLabel}>Scoring Rubric</Text>
-        <Text style={styles.sectionNote}>Rate each criterion from 1 (poor) to 10 (excellent).</Text>
+        <Text style={styles.sectionNote}>
+          Rate each question from 1 (lowest) to {maxPerQuestion} (highest).
+        </Text>
 
-        {criteria.map((criterion) => {
+        {criteria.map((criterion, index) => {
           const score = getScoreFor(project.id, criterion.id);
           return (
             <View key={criterion.id} style={styles.criterionCard}>
               <View style={styles.criterionHeader}>
                 <View style={styles.criterionMeta}>
-                  <Text style={styles.criterionLabel}>{criterion.label}</Text>
-                  <Text style={styles.criterionDesc}>{criterion.description}</Text>
-                </View>
-                <View style={styles.weightBadge}>
-                  <Text style={styles.weightText}>{Math.round(criterion.weight * 100)}%</Text>
+                  <Text style={styles.questionTag}>Q{index + 1} · {criterion.label}</Text>
+                  <Text style={styles.questionText}>{criterion.description}</Text>
                 </View>
               </View>
               <ScoreSlider
                 value={score}
-                onChange={(v) => submitScore(project.id, criterion.id, v)}
+                max={criterion.max_score}
+                onChange={(v) => handleScore(criterion.id, v)}
               />
+              <View style={styles.scaleHints}>
+                <Text style={styles.scaleHint}>1 = {criterion.low_label || 'lowest'}</Text>
+                <Text style={styles.scaleHint}>{criterion.max_score} = highest</Text>
+              </View>
               {score !== null && (
-                <Text style={styles.scoreConfirm}>Selected: {score}/10</Text>
+                <Text style={styles.scoreConfirm}>Selected: {score}/{criterion.max_score}</Text>
               )}
             </View>
           );
         })}
 
+        {/* Written feedback */}
+        <View style={styles.commentCard}>
+          <Text style={styles.criterionLabel}>Comments <Text style={styles.optional}>(optional)</Text></Text>
+          <Text style={styles.criterionDesc}>
+            Strengths, suggestions, or anything that stood out. Organisers may use these when announcing winners.
+          </Text>
+          <TextInput
+            style={styles.commentInput}
+            value={comment}
+            onChangeText={setComment}
+            placeholder="e.g. Great prototype and clear survey results…"
+            placeholderTextColor="#90A4AE"
+            multiline
+            maxLength={MAX_COMMENT}
+            textAlignVertical="top"
+            editable={!submitting}
+          />
+          <Text style={styles.charCount}>{comment.length}/{MAX_COMMENT}</Text>
+        </View>
+
         {total !== null && (
           <View style={styles.totalCard}>
-            <Text style={styles.totalLabel}>Weighted Score</Text>
-            <Text style={styles.totalValue}>{total} / 10</Text>
+            <Text style={styles.totalLabel}>Total Score</Text>
+            <Text style={styles.totalValue}>{total} / {maxTotal}</Text>
           </View>
         )}
       </ScrollView>
@@ -135,18 +222,23 @@ export default function ScoreScreen() {
           style={[styles.submitBtn, !allScored && styles.submitBtnDisabled]}
           onPress={handleSubmit}
           activeOpacity={0.85}
+          disabled={submitting}
         >
-          <Ionicons
-            name={allScored ? 'checkmark-circle' : 'lock-closed-outline'}
-            size={18}
-            color={allScored ? '#000' : '#90A4AE'}
-          />
+          {submitting ? (
+            <ActivityIndicator color="#000" />
+          ) : (
+            <Ionicons
+              name={allScored ? 'checkmark-circle' : 'lock-closed-outline'}
+              size={18}
+              color={allScored ? '#000' : '#90A4AE'}
+            />
+          )}
           <Text style={[styles.submitText, !allScored && styles.submitTextDisabled]}>
-            {allScored ? 'Submit Scores' : 'Score all criteria to submit'}
+            {submitting ? 'Saving…' : allScored ? 'Submit Scores' : 'Answer every question to submit'}
           </Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -184,21 +276,23 @@ const styles = StyleSheet.create({
   },
   criterionMeta: { flex: 1 },
   criterionLabel: { fontSize: 15, fontWeight: '700', color: '#000' },
-  criterionDesc: { fontSize: 12, color: '#546E7A', marginTop: 2 },
-  weightBadge: {
-    backgroundColor: '#E3F2FD',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#B0BEC5',
+  questionTag: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0277BD',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
   },
-  weightText: { fontSize: 12, fontWeight: '700', color: '#0277BD' },
+  questionText: { fontSize: 15, fontWeight: '700', color: '#000', lineHeight: 21 },
+  scaleHints: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, gap: 8 },
+  scaleHint: { fontSize: 11, color: '#546E7A', flexShrink: 1 },
+  criterionDesc: { fontSize: 12, color: '#546E7A', marginTop: 2 },
   sliderRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 4 },
   scoreBtn: {
     flex: 1,
-    aspectRatio: 1,
-    borderRadius: 8,
+    height: 48,
+    borderRadius: 10,
     backgroundColor: '#F0F4F8',
     alignItems: 'center',
     justifyContent: 'center',
@@ -210,9 +304,30 @@ const styles = StyleSheet.create({
     borderColor: '#000',
     borderWidth: 1.5,
   },
-  scoreBtnText: { fontSize: 12, fontWeight: '600', color: '#546E7A' },
+  scoreBtnText: { fontSize: 18, fontWeight: '700', color: '#546E7A' },
   scoreBtnTextSelected: { color: '#000', fontWeight: '800' },
   scoreConfirm: { fontSize: 11, color: '#546E7A', marginTop: 8, textAlign: 'right' },
+  commentCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1.5,
+    borderColor: '#000',
+  },
+  optional: { fontSize: 12, fontWeight: '400', color: '#546E7A' },
+  commentInput: {
+    marginTop: 10,
+    minHeight: 110,
+    borderWidth: 1,
+    borderColor: '#B0BEC5',
+    borderRadius: 8,
+    backgroundColor: '#F0F4F8',
+    padding: 10,
+    fontSize: 14,
+    color: '#000',
+  },
+  charCount: { fontSize: 11, color: '#90A4AE', marginTop: 6, textAlign: 'right' },
   totalCard: {
     backgroundColor: '#7DD3EA',
     borderRadius: 12,

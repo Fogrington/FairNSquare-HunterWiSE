@@ -33,3 +33,8 @@ button {
 input, select {
   font-family: inherit;
 }
+
+@media print {
+  body { background: #fff; }
+  @page { margin: 15mm; }
+}

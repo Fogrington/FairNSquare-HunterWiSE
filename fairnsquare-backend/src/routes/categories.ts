@@ -57,12 +57,14 @@ router.get('/:id/projects', requireAdmin, async (req: AuthRequest, res: Response
 })
 
 // GET /api/categories/:id/results — ranked results for a category (admin)
+// Each judge's total = sum of their criterion scores (complete scorecards only);
+// a project's result = the average of its judges' totals (HunterWiSE method).
 router.get('/:id/results', requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const result = await pool.query(
       `SELECT
          p.id, p.title, p.presenter, p.institution,
-         COUNT(DISTINCT s.judge_id) AS judge_count,
+         COUNT(subq.judge_id) AS judge_count,   -- judges with a complete scorecard
          AVG(
            subq.weighted_score
          ) AS average_score
@@ -71,13 +73,12 @@ router.get('/:id/results', requireAdmin, async (req: AuthRequest, res: Response)
          SELECT
            s.project_id,
            s.judge_id,
-           SUM(s.value * cr.weight) AS weighted_score
+           SUM(s.value) AS weighted_score
          FROM scores s
          JOIN criteria cr ON cr.id = s.criterion_id
          GROUP BY s.project_id, s.judge_id
          HAVING COUNT(s.criterion_id) = (SELECT COUNT(*) FROM criteria)
        ) subq ON subq.project_id = p.id
-       LEFT JOIN scores s ON s.project_id = p.id
        WHERE p.category_id = $1
        GROUP BY p.id, p.title, p.presenter, p.institution
        ORDER BY average_score DESC NULLS LAST`,

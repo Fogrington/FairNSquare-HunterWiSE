@@ -4,6 +4,7 @@ import {
   getAssignedProjects,
   getCriteria,
   submitScore as apiSubmitScore,
+  saveComment as apiSaveComment,
   getJudgeScores,
   saveToken,
   clearToken,
@@ -12,7 +13,7 @@ import {
   getStoredJudgeProfile,
   APIProject,
   APICriterion,
-} from '../services/api';
+} from '@/services/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,6 +32,7 @@ export type Project = {
   presenter: string;
   institution: string;
   description: string;
+  comment: string;
 };
 
 export type Criterion = {
@@ -38,6 +40,8 @@ export type Criterion = {
   label: string;
   description: string;
   weight: number;
+  max_score: number;
+  low_label: string | null;
 };
 
 export type ScoreEntry = {
@@ -57,6 +61,8 @@ type AuthContextType = {
   login: (username: string, accessCode: string) => Promise<boolean>;
   logout: () => void;
   submitScore: (projectId: number, criterionId: number, value: number) => Promise<void>;
+  saveComment: (projectId: number, comment: string) => Promise<void>;
+  verifyProjectSaved: (projectId: number) => Promise<boolean>;
   getScoreFor: (projectId: number, criterionId: number) => number | null;
   getProjectsForJudge: () => Project[];
   isProjectComplete: (projectId: number) => boolean;
@@ -72,6 +78,7 @@ function mapProject(p: APIProject): Project {
     presenter: p.presenter,
     institution: p.institution,
     description: p.description,
+    comment: p.comment ?? '',
   };
 }
 
@@ -161,20 +168,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     criterionId: number,
     value: number
   ) => {
+    const previous = scores.find(
+      s => s.projectId === projectId && s.criterionId === criterionId
+    );
+    const replace = (entry: ScoreEntry | undefined) =>
+      setScores(prev => {
+        const filtered = prev.filter(
+          s => !(s.projectId === projectId && s.criterionId === criterionId)
+        );
+        return entry ? [...filtered, entry] : filtered;
+      });
+
     // Optimistic local update first for instant UI response
-    setScores(prev => {
-      const filtered = prev.filter(
-        s => !(s.projectId === projectId && s.criterionId === criterionId)
-      );
-      return [...filtered, { projectId, criterionId, value }];
-    });
-    // Then persist to backend
+    replace({ projectId, criterionId, value });
     try {
       await apiSubmitScore(projectId, criterionId, value);
     } catch (err) {
-      console.error('Failed to submit score to backend:', err);
-      // Score still saved locally — will need sync when backend available
+      // Put the screen back to what the server actually has, and let the
+      // screen tell the judge — never pretend a failed save worked.
+      replace(previous);
+      throw err;
     }
+  };
+
+  const saveComment = async (projectId: number, comment: string) => {
+    const trimmed = comment.trim();
+    await apiSaveComment(projectId, trimmed);
+    setProjects(prev => prev.map(p => (p.id === projectId ? { ...p, comment: trimmed } : p)));
+  };
+
+  // Re-reads this judge's scores from the server and checks every criterion
+  // for the project is stored with the value shown on screen.
+  const verifyProjectSaved = async (projectId: number): Promise<boolean> => {
+    const serverScores = await getJudgeScores();
+    const synced = serverScores.map(s => ({
+      projectId: s.project_id,
+      criterionId: s.criterion_id,
+      value: s.value,
+    }));
+    const ok = criteria.every(c => {
+      const local = getScoreFor(projectId, c.id);
+      const remote = synced.find(s => s.projectId === projectId && s.criterionId === c.id);
+      return local !== null && remote !== undefined && remote.value === local;
+    });
+    if (!ok) setScores(synced);   // show the judge what's really saved
+    return ok;
   };
 
   const getScoreFor = (projectId: number, criterionId: number): number | null => {
@@ -194,7 +232,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       judge, projects, criteria, scores,
       loading, restoring, error,
       login, logout,
-      submitScore, getScoreFor,
+      submitScore, saveComment, verifyProjectSaved, getScoreFor,
       getProjectsForJudge, isProjectComplete,
     }}>
       {children}
@@ -207,12 +245,3 @@ export function useAuth(): AuthContextType {
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 }
-
-// Keep SCORING_CRITERIA export for any screens that still reference it
-// Will be replaced by live criteria from DB
-export const SCORING_CRITERIA = [
-  { id: 1, label: 'Innovation', description: 'Originality and novelty of the approach', weight: 0.3 },
-  { id: 2, label: 'Technical Merit', description: 'Soundness of methodology and execution', weight: 0.3 },
-  { id: 3, label: 'Impact', description: 'Potential real-world benefit and scalability', weight: 0.25 },
-  { id: 4, label: 'Presentation', description: 'Clarity and professionalism of delivery', weight: 0.15 },
-];

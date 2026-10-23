@@ -38,7 +38,7 @@ export default function Login() {
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
-            placeholder="admin@admin.admin"
+            placeholder="admin@hunterwise.org"
             autoComplete="email"
           />
 

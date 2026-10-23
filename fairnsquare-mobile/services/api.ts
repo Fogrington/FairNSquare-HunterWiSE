@@ -49,6 +49,21 @@ export async function getStoredJudgeProfile(): Promise<StoredJudge | null> {
 
 // ─── Base fetch wrapper ───────────────────────────────────────────────────────
 
+// Errors carry the HTTP status and the backend's error code (e.g. JUDGING_CLOSED)
+// so screens can show the right message.
+export class ApiError extends Error {
+  status: number
+  code?: string
+  constructor(message: string, status: number, code?: string) {
+    super(message)
+    this.status = status
+    this.code = code
+  }
+}
+
+// Generous, because a sleeping free-tier server can take ~a minute to wake up
+const REQUEST_TIMEOUT_MS = 60000
+
 async function request<T>(
   path: string,
   options: RequestInit = {}
@@ -64,18 +79,34 @@ async function request<T>(
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  const url = `${API_URL}${path}`
-  // console.log(options.method ?? 'GET', url)
-  const res = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers,
-  })
-  const text = await res.text()
-  // console.log(res.status, text.slice(0, 200))
-  const data = JSON.parse(text)
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+  let res: Response
+  let text: string
+  try {
+    res = await fetch(`${API_URL}${path}`, { ...options, headers, signal: controller.signal })
+    text = await res.text()
+  } catch {
+    throw new ApiError(
+      "Couldn't reach the FairN² server. Check your internet connection and try again.",
+      0,
+      'NETWORK'
+    )
+  } finally {
+    clearTimeout(timeout)
+  }
+
+  // A server that's restarting can answer with an HTML error page instead of JSON
+  let data: any
+  try {
+    data = text ? JSON.parse(text) : {}
+  } catch {
+    throw new ApiError('The server is not responding properly. Please try again in a moment.', res.status, 'BAD_RESPONSE')
+  }
 
   if (!res.ok) {
-    throw new Error(data.error || `Request failed: ${res.status}`)
+    throw new ApiError(data.error || `Request failed (${res.status})`, res.status, data.code)
   }
 
   return data as T
@@ -113,6 +144,7 @@ export type APIProject = {
   presenter: string
   institution: string
   description: string
+  comment: string | null   // this judge's written feedback, if any
 }
 
 // The backend identifies the judge from the token, so no id in the URL
@@ -124,9 +156,11 @@ export async function getAssignedProjects(): Promise<APIProject[]> {
 
 export type APICriterion = {
   id: number
-  label: string
-  description: string
+  label: string              // short name, e.g. "Problem"
+  description: string        // the full rubric question
   weight: number
+  max_score: number          // scores run 1..max_score
+  low_label: string | null   // what a score of 1 means
 }
 
 export async function getCriteria(): Promise<APICriterion[]> {
@@ -157,4 +191,13 @@ export type APIJudgeScore = {
 
 export async function getJudgeScores(): Promise<APIJudgeScore[]> {
   return request<APIJudgeScore[]>('/judges/me/scores')
+}
+
+// ─── Comments ─────────────────────────────────────────────────────────────────
+
+export async function saveComment(projectId: number, comment: string): Promise<void> {
+  await request(`/judges/me/projects/${projectId}/comment`, {
+    method: 'PUT',
+    body: JSON.stringify({ comment }),
+  })
 }

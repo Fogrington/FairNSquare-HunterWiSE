@@ -1,0 +1,81 @@
+.page {
+  background: #fff;
+  min-height: 100vh;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 32px 48px;
+  color: #111;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  gap: 12px;
+}
+.backBtn {
+  background: none;
+  border: none;
+  color: var(--blue-dark);
+  font-size: 14px;
+  font-weight: 700;
+}
+.printBtn {
+  background: var(--blue);
+  border: 1.5px solid var(--black);
+  border-radius: 50px;
+  padding: 10px 28px;
+  font-size: 15px;
+  font-weight: 800;
+}
+.printBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.header { border-bottom: 3px solid #111; padding-bottom: 12px; margin-bottom: 24px; }
+.title { font-size: 30px; font-weight: 800; }
+.meta { font-size: 13px; color: #444; margin-top: 4px; }
+.warning { font-size: 14px; font-weight: 700; color: var(--danger); margin-top: 6px; }
+.message { font-size: 14px; color: #555; padding: 12px 0; }
+
+.category { margin-bottom: 36px; }
+.categoryName {
+  font-size: 22px;
+  font-weight: 800;
+  margin-bottom: 10px;
+  padding-bottom: 4px;
+  border-bottom: 1.5px solid #111;
+}
+
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #555;
+  border-bottom: 1.5px solid #111;
+  padding: 6px 8px;
+}
+.table td { padding: 8px; border-bottom: 1px solid #ccc; vertical-align: top; }
+.placeCol { width: 56px; font-weight: 800; }
+.numCol { text-align: right; white-space: nowrap; }
+.projectCell { font-weight: 700; }
+.winner td { background: #EAF6FB; }
+.winner .placeCol::after { content: ' 🏆'; }
+
+.comments { margin-top: 18px; }
+.commentsTitle { font-size: 15px; font-weight: 800; margin-bottom: 8px; }
+.commentProject { margin-bottom: 12px; break-inside: avoid; }
+.commentProjectName { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.commentList { padding-left: 20px; font-size: 13px; line-height: 1.5; }
+.commentList li { margin-bottom: 4px; }
+.commentJudge { color: #555; font-style: italic; white-space: nowrap; }
+
+@media print {
+  .toolbar { display: none; }
+  .page { padding: 0; max-width: none; }
+  /* Each category starts on a new page so the MC can work through them in order */
+  .category + .category { break-before: page; }
+  .table tr { break-inside: avoid; }
+  .winner td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
