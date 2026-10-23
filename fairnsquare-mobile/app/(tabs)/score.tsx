@@ -153,8 +153,8 @@ export default function ScoreScreen() {
             <Text style={styles.backLinkText}>Projects</Text>
           </TouchableOpacity>
           <Text style={styles.projectTitle}>{project.title}</Text>
-          <Text style={styles.presenter}>{project.presenter} · {project.institution}</Text>
-          <Text style={styles.description}>{project.description}</Text>
+          <Text style={styles.presenter}>{[project.presenter, project.institution].filter(Boolean).join(' · ')}</Text>
+          {!!project.description && <Text style={styles.description}>{project.description}</Text>}
         </View>
 
         <Text style={styles.sectionLabel}>Scoring Rubric</Text>

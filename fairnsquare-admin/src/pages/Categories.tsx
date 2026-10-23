@@ -153,7 +153,7 @@ export default function Categories() {
                 <div key={p.id} className={styles.projectRow}>
                   <div>
                     <span className={styles.projectTitle}>{p.title}</span>
-                    <span className={styles.projectMeta}>{p.presenter} · {p.institution}</span>
+                    <span className={styles.projectMeta}>{[p.presenter, p.institution].filter(Boolean).join(' · ')}</span>
                   </div>
                   <button className={styles.removeProjectBtn} onClick={() => removeProject(p.id).catch(err => alert(err.message || 'Remove failed.'))}>✕</button>
                 </div>

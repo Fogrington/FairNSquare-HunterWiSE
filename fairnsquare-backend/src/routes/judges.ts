@@ -37,7 +37,8 @@ router.get('/me/projects', requireJudge, async (req: AuthRequest, res: Response)
        JOIN judge_project jp ON jp.project_id = p.id
        JOIN categories c ON c.id = p.category_id
        WHERE jp.judge_id = $1
-       ORDER BY p.title`,
+       ORDER BY p.id  -- project id = poster number, so posters list in number order
+      `,
       [req.judgeId]
     )
     res.json(result.rows)

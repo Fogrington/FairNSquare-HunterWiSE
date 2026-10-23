@@ -229,7 +229,7 @@ export default function Results() {
                 <div>
                   <span className={styles.rank}>#{idx + 1}</span>
                   <span className={styles.projectTitle}>{project.title}</span>
-                  <span className={styles.projectMeta}>{project.presenter} · {project.institution}</span>
+                  <span className={styles.projectMeta}>{[project.presenter, project.institution].filter(Boolean).join(' · ')}</span>
                 </div>
               </div>
               <div className={styles.scoreDisplay}>

@@ -27,7 +27,7 @@ function ProjectCard({
             {project.title}
           </Text>
           <Text style={styles.presenter}>
-            {project.presenter} · {project.institution}
+            {[project.presenter, project.institution].filter(Boolean).join(' · ')}
           </Text>
         </View>
         <View style={[styles.badge, complete ? styles.badgeDone : styles.badgePending]}>
@@ -41,9 +41,11 @@ function ProjectCard({
           </Text>
         </View>
       </View>
-      <Text style={styles.description} numberOfLines={2}>
-        {project.description}
-      </Text>
+      {!!project.description && (
+        <Text style={styles.description} numberOfLines={2}>
+          {project.description}
+        </Text>
+      )}
       <View style={styles.cardFooter}>
         <Text style={styles.scoreCTA}>
           {complete ? 'Review / Edit scores →' : 'Tap to score →'}
