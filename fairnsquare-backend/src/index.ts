@@ -44,8 +44,12 @@ app.get('/api/health', (_req, res) => {
 })
 
 // ─── Start ────────────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`FairN² API running on http://localhost:${PORT}`)
-})
+// Only bind a port when run directly (npm start / dev), so the test suite
+// can import the app and drive it in-process with Supertest.
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`FairN² API running on http://localhost:${PORT}`)
+  })
+}
 
 export default app
